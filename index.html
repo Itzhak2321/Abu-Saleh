@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SalehDesk1 - Pure WhatsApp</title>
+    <style>
+        :root {
+            --wa-teal: #075e54;
+            --wa-bg: #e5ddd5;
+            --wa-bubble: #dcf8c6;
+        }
+
+        body {
+            margin: 0;
+            background-color: var(--wa-bg);
+            background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png');
+            font-family: 'Segoe UI', Roboto, sans-serif;
+        }
+
+        /* סרגל עליון עם לוגו קטן משמאל */
+        .app-bar {
+            background-color: var(--wa-teal);
+            color: white;
+            padding: 10px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .app-bar-title { font-size: 1.2rem; font-weight: 500; }
+        
+        .app-logo {
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            border: 1px solid white;
+            overflow: hidden;
+        }
+        .app-logo img { width: 100%; height: 100%; object-fit: cover; }
+
+        .feed-container {
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* בועת WhatsApp נקייה */
+        .wa-bubble {
+            background-color: var(--wa-bubble);
+            align-self: flex-start;
+            max-width: 85%;
+            padding: 6px 7px 3px;
+            border-radius: 10px 0 10px 10px;
+            margin-bottom: 10px;
+            position: relative;
+            box-shadow: 0 1px 1px rgba(0,0,0,0.15);
+            font-size: 15px;
+            line-height: 1.4;
+        }
+
+        .wa-bubble img {
+            width: 100%;
+            border-radius: 8px;
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        .wa-text { margin-bottom: 4px; color: #303030; }
+
+        .wa-footer {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            color: rgba(0,0,0,0.45);
+        }
+
+        .wa-check { color: #34b7f1; font-weight: bold; }
+
+        .share-link {
+            display: block;
+            text-align: center;
+            color: #007bff;
+            font-size: 12px;
+            text-decoration: none;
+            margin-top: 8px;
+            border-top: 1px solid rgba(0,0,0,0.05);
+            padding-top: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-bar">
+        <div class="app-bar-title">חדשות אבו צאלח</div>
+        <div class="app-logo">
+            <img src="https://t.me/i/userpic/320/salehdesk1.jpg" alt="logo">
+        </div>
+    </div>
+
+    <div class="feed-container" id="tg-feed">
+        <div style="text-align: center; padding: 20px;">טוען הודעות...</div>
+    </div>
+
+    <script>
+        const googleScriptUrl = 'https://script.google.com/macros/s/AKfycbw7dcxIja7ynVMR05sViOpS67Pok2ap1hRxZe3mOfbX0i3ByDdGJ1F-N2Jn0BirkjrWDw/exec'; // כאן הכתובת שלך
+
+        async function loadFeed() {
+            try {
+                const response = await fetch(googleScriptUrl);
+                const html = await response.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                
+                // שליפת הפוסטים מהקוד של טלגרם
+                const messages = Array.from(doc.querySelectorAll('.tgme_widget_message')).slice(-30).reverse();
+                const container = document.getElementById('tg-feed');
+                container.innerHTML = '';
+
+                messages.forEach(msg => {
+                    // 1. שליפת טקסט
+                    const textContent = msg.querySelector('.tgme_widget_message_text')?.innerHTML || "";
+                    
+                    // 2. שליפת תמונה (אם קיימת)
+                    const photoWrap = msg.querySelector('.tgme_widget_message_photo_wrap');
+                    let photoUrl = "";
+                    if (photoWrap) {
+                        const style = photoWrap.getAttribute('style');
+                        const match = style.match(/url\(['"]?([^'"]+)['"]?\)/);
+                        if (match) photoUrl = match[1];
+                    }
+
+                    // 3. שליפת שעה מקורית של הפוסט
+                    const timeEl = msg.querySelector('time');
+                    const timestamp = timeEl ? new Date(timeEl.getAttribute('datetime')) : new Date();
+                    const formattedTime = timestamp.toLocaleTimeString('he-IL', {hour: '2-digit', minute:'2-digit'});
+
+                    // 4. בניית הבועה מחדש ללא הלוגו המיותר
+                    const bubble = document.createElement('div');
+                    bubble.className = 'wa-bubble';
+
+                    let bubbleHtml = "";
+                    if (photoUrl) bubbleHtml += `<img src="${photoUrl}">`;
+                    bubbleHtml += `<div class="wa-text">${textContent}</div>`;
+                    bubbleHtml += `
+                        <div class="wa-footer">
+                            <span>${formattedTime}</span>
+                            <span class="wa-check">✓✓</span>
+                        </div>
+                        <a href="#" class="share-link" onclick="shareIt('https://t.me/${msg.getAttribute('data-post')}'); return false;">שיתוף פוסט</a>
+                    `;
+
+                    bubble.innerHTML = bubbleHtml;
+                    container.appendChild(bubble);
+                });
+            } catch (e) {
+                container.innerHTML = "שגיאה בטעינת הנתונים.";
+            }
+        }
+
+        function shareIt(url) {
+            if(navigator.share) navigator.share({url: url});
+            else window.open(url, '_blank');
+        }
+
+        loadFeed();
+    </script>
+</body>
+</html>
